@@ -45,7 +45,7 @@ export default function Planner() {
 
   function select(day: string) {
     setSelected(day);
-    window.history.replaceState(null, "", `/?day=${day}`);
+    window.history.replaceState(null, "", `${window.location.pathname}?day=${day}`);
   }
 
   async function toggle(task: Task) {
@@ -85,8 +85,8 @@ export default function Planner() {
       <div className="progress-track" role="progressbar" aria-label="Виконано дій" aria-valuenow={completed} aria-valuemin={0} aria-valuemax={tasks.length || 1}><div style={{ width: `${progress}%` }} /></div>
       {error && <div className="error-box" role="alert"><p>{error}</p><button className="text-button" onClick={() => setReload((v) => v + 1)}>Спробувати ще раз</button></div>}
       {loading ? <div className="loading-state" role="status"><span className="loading-dot" />Відкриваю твій план…</div> : !error || tasks.length > 0 ? tasks.length ? <div className="task-list">{tasks.map((task) => <div className={`task-row ${isTaskDone(task) ? "done" : ""}`} key={task.id}>
-        {task.subtasks.length > 0 ? <Link className="progress-hit" href={`/tasks/${task.id}`} aria-label={`Піддії: ${task.title}`}><TaskProgress completed={task.subtasks.filter((subtask) => subtask.done).length} total={task.subtasks.length} /></Link> : <CheckBox checked={task.done} disabled={busy} onChange={() => toggle(task)} label={`${task.done ? "Позначити невиконаною" : "Виконати"}: ${task.title}`} />}
-        <Link className="task-link" href={`/tasks/${task.id}`}><span className="task-copy"><span className="task-title">{task.title}</span></span><Icon name="arrow-right" width="16" /></Link>
+        {task.subtasks.length > 0 ? <Link className="progress-hit" href={`/tasks/?id=${task.id}`} aria-label={`Піддії: ${task.title}`}><TaskProgress completed={task.subtasks.filter((subtask) => subtask.done).length} total={task.subtasks.length} /></Link> : <CheckBox checked={task.done} disabled={busy} onChange={() => toggle(task)} label={`${task.done ? "Позначити невиконаною" : "Виконати"}: ${task.title}`} />}
+        <Link className="task-link" href={`/tasks/?id=${task.id}`}><span className="task-copy"><span className="task-title">{task.title}</span></span><Icon name="arrow-right" width="16" /></Link>
       </div>)}</div> : <div className="empty-state"><div className="empty-art"><span className="art-ring" /><Icon name="sun" width="34" height="34" /><span className="art-spark">✦</span></div><h3>День починається з однієї дії</h3><p>Додай те, що хочеш зробити.<br />Решта — крок за кроком.</p></div> : null}
       {!loading && tasks.length > 0 && !error && <p className="plan-caption" aria-live="polite">{completed === tasks.length ? "Усе зроблено. Час видихнути ✨" : "Кожна маленька дія має значення."}</p>}
     </section>
