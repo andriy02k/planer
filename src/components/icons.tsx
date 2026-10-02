@@ -1,8 +1,11 @@
 import type { SVGProps } from "react";
 
-type IconName = "arrow-left" | "arrow-right" | "plus" | "check" | "close" | "calendar" | "sun" | "trash" | "edit";
+type IconName = "arrow-left" | "arrow-right" | "plus" | "check" | "close" | "calendar" | "sun" | "trash" | "edit" | "copy" | "grip" | "inbox";
 
 const paths: Record<IconName, React.ReactNode> = {
+  copy: <><rect x="8" y="8" width="12" height="13" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3" /></>,
+  grip: <><path d="M8 5h.01M16 5h.01M8 12h.01M16 12h.01M8 19h.01M16 19h.01" strokeWidth="3" /></>,
+  inbox: <><path d="m4 4-2 10v6h20v-6L20 4H4Z" /><path d="M2 14h6l2 3h4l2-3h6" /></>,
   "arrow-left": <path d="m14 6-6 6 6 6M8 12h12" />,
   "arrow-right": <path d="m10 6 6 6-6 6M4 12h12" />,
   plus: <path d="M12 5v14M5 12h14" />,

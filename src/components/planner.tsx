@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { dateKey, dayTitle, fromKey, isDateKey, longDate, shiftDay } from "@/lib/dates";
-import { getTasks, isTaskDone, newTask, saveTask, type Task } from "@/lib/db";
-import { CheckBox, Icon, TaskProgress } from "./icons";
+import { getTasks, isTaskDone, newTask, reorderTasks, saveTask, type Task } from "@/lib/db";
+import { Icon } from "./icons";
 import TaskForm, { type TaskFields } from "./task-form";
+import TaskList from "./task-list";
 
 export default function Planner() {
   const [selected, setSelected] = useState("");
@@ -60,10 +61,18 @@ export default function Planner() {
   }
 
   async function add(fields: TaskFields) {
-    const task = newTask(fields.title, fields.date, fields.description);
-    await saveTask(task);
+    const task = await saveTask(newTask(fields.title, fields.date, fields.description));
     if (fields.date === selectedRef.current) setTasks((list) => [...list, task]);
     else select(fields.date);
+  }
+
+  async function reorder(next: Task[]) {
+    if (busyRef.current) return;
+    const day = selected;
+    busyRef.current = true; setBusy(true); setError("");
+    try { await reorderTasks(day, next.map((task) => task.id)); if (selectedRef.current === day) setTasks(next); }
+    catch { setError("Не вдалося зберегти порядок. Спробуй ще раз."); }
+    finally { busyRef.current = false; setBusy(false); }
   }
 
   const completed = tasks.filter(isTaskDone).length;
@@ -80,14 +89,12 @@ export default function Planner() {
       <button className="week-arrow icon-button" aria-label="Наступні сім днів" onClick={() => select(shiftDay(selected, 7))} disabled={!selected}><Icon name="arrow-right" width="17" /></button>
     </nav>
     {selected && selected !== today && <button className="back-today" onClick={() => select(today)}>Повернутися до сьогодні <Icon name="arrow-left" width="14" /></button>}
+    <Link className="backlog-link" href="/backlog/"><Icon name="inbox" width="17" />Без дати<Icon name="arrow-right" width="15" /></Link>
     <section className="plan-section" aria-labelledby="plan-title">
       <div className="section-heading"><h2 id="plan-title">План на день</h2><span>{!loading && !error ? `${completed} / ${tasks.length}` : "—"}</span></div>
       <div className="progress-track" role="progressbar" aria-label="Виконано дій" aria-valuenow={completed} aria-valuemin={0} aria-valuemax={tasks.length || 1}><div style={{ width: `${progress}%` }} /></div>
       {error && <div className="error-box" role="alert"><p>{error}</p><button className="text-button" onClick={() => setReload((v) => v + 1)}>Спробувати ще раз</button></div>}
-      {loading ? <div className="loading-state" role="status"><span className="loading-dot" />Відкриваю твій план…</div> : !error || tasks.length > 0 ? tasks.length ? <div className="task-list">{tasks.map((task) => <div className={`task-row ${isTaskDone(task) ? "done" : ""}`} key={task.id}>
-        {task.subtasks.length > 0 ? <Link className="progress-hit" href={`/tasks/?id=${task.id}`} aria-label={`Піддії: ${task.title}`}><TaskProgress completed={task.subtasks.filter((subtask) => subtask.done).length} total={task.subtasks.length} /></Link> : <CheckBox checked={task.done} disabled={busy} onChange={() => toggle(task)} label={`${task.done ? "Позначити невиконаною" : "Виконати"}: ${task.title}`} />}
-        <Link className="task-link" href={`/tasks/?id=${task.id}`}><span className="task-copy"><span className="task-title">{task.title}</span></span><Icon name="arrow-right" width="16" /></Link>
-      </div>)}</div> : <div className="empty-state"><div className="empty-art"><span className="art-ring" /><Icon name="sun" width="34" height="34" /><span className="art-spark">✦</span></div><h3>День починається з однієї дії</h3><p>Додай те, що хочеш зробити.<br />Решта — крок за кроком.</p></div> : null}
+      {loading ? <div className="loading-state" role="status"><span className="loading-dot" />Відкриваю твій план…</div> : !error || tasks.length > 0 ? tasks.length ? <TaskList tasks={tasks} busy={busy} onToggle={toggle} onReorder={reorder} /> : <div className="empty-state"><div className="empty-art"><span className="art-ring" /><Icon name="sun" width="34" height="34" /><span className="art-spark">✦</span></div><h3>День починається з однієї дії</h3><p>Додай те, що хочеш зробити.<br />Решта — крок за кроком.</p></div> : null}
       {!loading && tasks.length > 0 && !error && <p className="plan-caption" aria-live="polite">{completed === tasks.length ? "Усе зроблено. Час видихнути ✨" : "Кожна маленька дія має значення."}</p>}
     </section>
     <footer className="bottom-bar"><button className="primary-button" onClick={() => setAdding(true)} disabled={!selected || loading}><span>Додати дію</span><Icon name="plus" /></button><p>Менше шуму. Більше свого.</p></footer>

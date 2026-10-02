@@ -7,7 +7,10 @@ export type Task = {
   done: boolean;
   subtasks: Subtask[];
   createdAt: number;
+  order?: number;
 };
+
+export const taskListHref = (date: string) => date ? `/?day=${date}` : "/backlog/";
 
 export function isTaskDone(task: Task): boolean {
   return task.subtasks.length > 0 ? task.subtasks.every((subtask) => subtask.done) : task.done;
@@ -52,15 +55,55 @@ async function transact<T>(mode: IDBTransactionMode, operation: (store: IDBObjec
 
 export async function getTasks(date: string): Promise<Task[]> {
   const tasks = await transact<Task[]>("readonly", (store) => store.index("date").getAll(date));
-  return tasks.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+  return tasks.sort((a, b) => (a.order ?? a.createdAt) - (b.order ?? b.createdAt) || a.id.localeCompare(b.id));
 }
 
 export function getTask(id: string): Promise<Task | undefined> {
   return transact("readonly", (store) => store.get(id));
 }
 
-export async function saveTask(task: Task): Promise<void> {
-  await transact("readwrite", (store) => store.put({ ...task, done: isTaskDone(task) }));
+export async function saveTask(task: Task): Promise<Task> {
+  const db = await database();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("tasks", "readwrite");
+    const store = tx.objectStore("tasks");
+    const request = store.index("date").getAll(task.date);
+    let updated: Task;
+    request.onsuccess = () => {
+      const list = request.result as Task[];
+      const existing = list.find((item) => item.id === task.id);
+      updated = { ...task, done: isTaskDone(task), order: existing?.order ?? (existing ? existing.createdAt : Math.max(0, ...list.map((item) => item.order ?? item.createdAt)) + 1) };
+      store.put(updated);
+    };
+    tx.oncomplete = () => resolve(updated);
+    tx.onerror = () => reject(tx.error || request.error);
+    tx.onabort = () => reject(tx.error || new Error("Не вдалося зберегти зміни."));
+  });
+}
+
+export async function reorderTasks(date: string, ids: string[]): Promise<void> {
+  const db = await database();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("tasks", "readwrite");
+    const store = tx.objectStore("tasks");
+    const request = store.index("date").getAll(date);
+    request.onsuccess = () => {
+      const list = request.result as Task[];
+      const byId = new Map(list.map((task) => [task.id, task]));
+      const unique = [...new Set(ids)];
+      const ordered = unique.map((id) => byId.get(id)).filter((task): task is Task => !!task);
+      const remaining = list.filter((task) => !unique.includes(task.id)).sort((a, b) => (a.order ?? a.createdAt) - (b.order ?? b.createdAt));
+      [...ordered, ...remaining].forEach((task, order) => store.put({ ...task, order }));
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || request.error);
+    tx.onabort = () => reject(tx.error || new Error("Не вдалося зберегти порядок."));
+  });
+}
+
+export async function copyTask(task: Task, date: string): Promise<Task> {
+  const copy = { ...task, id: crypto.randomUUID(), date, createdAt: Date.now(), order: undefined, subtasks: task.subtasks.map((item) => ({ ...item, id: crypto.randomUUID() })) };
+  return saveTask(copy);
 }
 
 export async function deleteTask(id: string): Promise<void> {
